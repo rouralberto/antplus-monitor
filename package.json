@@ -1,0 +1,17 @@
+{
+  "name": "antplus-monitor",
+  "version": "1.0.0",
+  "description": "Real-time ANT+ bike trainer monitor",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "ant-plus-next": "^0.4.0",
+    "ws": "^8.20.0"
+  }
+}

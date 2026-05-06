@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VELO LAB</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="hud">
+
+    <div class="top-bar">
+      <div class="brand">VELO<span>LAB</span></div>
+      <div class="session-time" id="elapsed">00:00</div>
+      <div id="status" class="indicator off">
+        <span class="beacon"></span>
+        <span id="status-text">NO SIGNAL</span>
+      </div>
+    </div>
+
+    <div class="primary">
+
+      <div class="metric hero power-metric" id="powerBlock">
+        <div class="metric-label">POWER</div>
+        <div class="metric-hero-row">
+          <span class="metric-value" id="power">—</span>
+          <span class="metric-unit">W</span>
+        </div>
+        <div class="power-zone-bar">
+          <div class="zone-fill" id="zoneFill"></div>
+        </div>
+        <div class="zone-label" id="zoneLabel">—</div>
+      </div>
+
+      <div class="metric-pair">
+        <div class="metric" id="speedBlock">
+          <div class="metric-label">SPEED</div>
+          <div class="metric-row">
+            <span class="metric-value" id="speed">—</span>
+            <span class="metric-unit">km/h</span>
+          </div>
+        </div>
+        <div class="metric" id="cadenceBlock">
+          <div class="metric-label">CADENCE</div>
+          <div class="metric-row">
+            <span class="metric-value" id="cadence">—</span>
+            <span class="metric-unit">rpm</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric hr-metric" id="hrBlock">
+        <div class="metric-label">HEART RATE</div>
+        <div class="metric-row">
+          <span class="metric-value" id="heartRate">—</span>
+          <span class="metric-unit">bpm</span>
+        </div>
+        <div class="hr-visual">
+          <div class="hr-bar" id="hrBar"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="chart-wrap">
+      <canvas id="powerChart"></canvas>
+    </div>
+
+    <div class="secondary">
+      <div class="stat">
+        <div class="stat-val" id="avgPower">—</div>
+        <div class="stat-lbl">AVG <span>W</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="maxPower">—</div>
+        <div class="stat-lbl">MAX <span>W</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="distance">—</div>
+        <div class="stat-lbl">DIST <span>km</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="calories">—</div>
+        <div class="stat-lbl">KCAL</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="np">—</div>
+        <div class="stat-lbl">NP <span>W</span></div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="tss">—</div>
+        <div class="stat-lbl">IF</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
