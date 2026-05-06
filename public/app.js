@@ -29,6 +29,10 @@ let powerSum = 0;
 let powerCount = 0;
 let fourthPowerSum = 0;
 
+// Distance accumulation from speed (meters)
+let accumulatedDistance = 0;
+let lastDataTime = null;
+
 // Auto-reset: track consecutive zero-power seconds
 const ZERO_POWER_RESET_MS = 120_000;
 const COUNTDOWN_START_MS = 30_000;
@@ -168,6 +172,8 @@ function resetExercise() {
   powerSum = 0;
   powerCount = 0;
   fourthPowerSum = 0;
+  accumulatedDistance = 0;
+  lastDataTime = null;
   zeroPowerSince = null;
   hideCountdown();
 
@@ -303,7 +309,7 @@ function updateUI(data) {
       speed: data.speed,
       cadence: data.cadence,
       hr: data.heartRate,
-      distance: data.distance,
+      distance: data.distance ?? accumulatedDistance,
       calories: data.calories,
     });
 
@@ -329,6 +335,23 @@ function updateUI(data) {
 
   if (data.speed != null) {
     speedEl.textContent = (data.speed * 3.6).toFixed(1);
+
+    if (lastDataTime != null) {
+      const dt = (now - lastDataTime) / 1000;
+      if (dt > 0 && dt < 10) {
+        accumulatedDistance += data.speed * dt;
+      }
+    }
+    lastDataTime = now;
+  }
+
+  const distMeters = data.distance != null ? data.distance : accumulatedDistance;
+  if (distMeters >= 1000) {
+    $("distance").textContent = (distMeters / 1000).toFixed(2);
+    $("distUnit").textContent = "km";
+  } else {
+    $("distance").textContent = Math.round(distMeters);
+    $("distUnit").textContent = "m";
   }
 
   if (data.cadence != null) {
@@ -341,10 +364,6 @@ function updateUI(data) {
     hrEl.style.color = "var(--hr-color)";
     const pct = Math.min(100, Math.max(0, ((hr - 60) / 140) * 100));
     $("hrBar").style.width = pct + "%";
-  }
-
-  if (data.distance != null) {
-    $("distance").textContent = (data.distance / 1000).toFixed(2);
   }
 
   $("elapsed").textContent = formatTime(data.elapsedTime);
