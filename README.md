@@ -2,7 +2,7 @@
 
 Real-time ANT+ bike trainer monitor. Connects to any ANT+ fitness equipment (trainers, smart bikes) via USB stick and displays live power, speed, cadence, and heart rate in a browser dashboard.
 
-<img width="1570" height="907" alt="velolab-antplus-monitor" src="https://github.com/user-attachments/assets/d826e7a2-808c-4865-ba1f-cba64df49893" />
+<img width="1570" height="907" alt="velolab-antplus-monitor" src="docs/velolab-antplus-monitor.png" />
 
 ## Requirements
 

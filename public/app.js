@@ -20,24 +20,22 @@ function getZone(watts) {
   return { idx: 6, ...ZONES[6] };
 }
 
-// Full exercise data — grows unbounded for the whole session
 let exerciseData = [];
-let exerciseStartTime = null;
 let lastUpdate = 0;
 let maxPowerSeen = 0;
 let powerSum = 0;
 let powerCount = 0;
 let fourthPowerSum = 0;
-
-// Distance accumulation from speed (meters)
 let accumulatedDistance = 0;
-let lastDataTime = null;
+let sessionElapsed = 0;
 
 // Auto-reset: track consecutive zero-power seconds
 const ZERO_POWER_RESET_MS = 120_000;
 const COUNTDOWN_START_MS = 30_000;
 let zeroPowerSince = null;
 let countdownInterval = null;
+
+let ws = null;
 
 const canvas = $("powerChart");
 const ctx = canvas.getContext("2d");
@@ -86,7 +84,6 @@ function drawChart() {
 
   const ceiling = Math.max(FTP * 1.3, maxPowerSeen * 1.1, 100);
 
-  // FTP reference line
   const ftpY = pad.top + plotH - (FTP / ceiling) * plotH;
   ctx.strokeStyle = "rgba(255,255,255,0.10)";
   ctx.lineWidth = 1;
@@ -102,7 +99,6 @@ function drawChart() {
   ctx.textAlign = "right";
   ctx.fillText("FTP", pad.left - 6, ftpY + 3);
 
-  // Y-axis grid
   const gridSteps = [100, 200, 300, 400, 500];
   ctx.strokeStyle = "rgba(255,255,255,0.04)";
   for (const step of gridSteps) {
@@ -119,7 +115,6 @@ function drawChart() {
   const len = exerciseData.length;
   if (len < 2) return;
 
-  // Bar width: fill the whole plot with all data points
   const barW = Math.max(1, plotW / len - 0.5);
 
   for (let i = 0; i < len; i++) {
@@ -133,7 +128,6 @@ function drawChart() {
     ctx.fillRect(x, y, barW, barH);
   }
 
-  // Smooth line on top
   ctx.beginPath();
   for (let i = 0; i < len; i++) {
     const x = pad.left + (i / len) * plotW + barW / 2;
@@ -147,7 +141,6 @@ function drawChart() {
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Time labels along bottom
   if (len > 10) {
     const totalSec = (exerciseData[len - 1].ts - exerciseData[0].ts) / 1000;
     const labelCount = Math.min(6, Math.floor(totalSec / 60));
@@ -166,14 +159,21 @@ function drawChart() {
 }
 
 function resetExercise() {
+  // Tell server to reset its session
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: "resetSession" }));
+  }
+  applyReset();
+}
+
+function applyReset() {
   exerciseData = [];
-  exerciseStartTime = null;
   maxPowerSeen = 0;
   powerSum = 0;
   powerCount = 0;
   fourthPowerSum = 0;
   accumulatedDistance = 0;
-  lastDataTime = null;
+  sessionElapsed = 0;
   zeroPowerSince = null;
   hideCountdown();
 
@@ -187,6 +187,7 @@ function resetExercise() {
   $("avgPower").textContent = "—";
   $("maxPower").textContent = "—";
   $("distance").textContent = "—";
+  $("distUnit").textContent = "km";
   $("calories").textContent = "—";
   $("np").textContent = "—";
   $("tss").textContent = "—";
@@ -194,6 +195,67 @@ function resetExercise() {
   $("zoneLabel").textContent = "—";
   $("zoneLabel").style.color = "";
   $("hrBar").style.width = "0%";
+
+  drawChart();
+}
+
+function restoreSession(data) {
+  exerciseData = data.exerciseData || [];
+  maxPowerSeen = data.maxPowerSeen || 0;
+  powerSum = data.powerSum || 0;
+  powerCount = data.powerCount || 0;
+  fourthPowerSum = data.fourthPowerSum || 0;
+  accumulatedDistance = data.accumulatedDistance || 0;
+
+  if (data.startedAt) {
+    sessionElapsed = (Date.now() - data.startedAt) / 1000;
+  }
+
+  // Rebuild UI from restored state
+  $("elapsed").textContent = formatTime(sessionElapsed);
+  $("maxPower").textContent = maxPowerSeen || "—";
+
+  if (powerCount > 0) {
+    $("avgPower").textContent = Math.round(powerSum / powerCount);
+    const np = Math.round(Math.pow(fourthPowerSum / powerCount, 0.25));
+    $("np").textContent = np;
+    $("tss").textContent = (np / FTP).toFixed(2);
+  }
+
+  const distMeters = accumulatedDistance;
+  if (distMeters >= 1000) {
+    $("distance").textContent = (distMeters / 1000).toFixed(2);
+    $("distUnit").textContent = "km";
+  } else if (distMeters > 0) {
+    $("distance").textContent = Math.round(distMeters);
+    $("distUnit").textContent = "m";
+  }
+
+  if (exerciseData.length > 0) {
+    const last = exerciseData[exerciseData.length - 1];
+    if (last.power > 0) {
+      const zone = getZone(last.power);
+      $("power").textContent = last.power;
+      $("power").style.color = zone.color;
+      $("zoneFill").style.width = Math.min(100, (last.power / (FTP * 1.5)) * 100) + "%";
+      $("zoneFill").style.background = zone.color;
+      $("zoneLabel").textContent = `Z${zone.idx + 1} · ${zone.name}`;
+      $("zoneLabel").style.color = zone.color;
+    }
+    if (last.speed != null) {
+      $("speed").textContent = (last.speed * 3.6).toFixed(1);
+    }
+    if (last.cadence != null) {
+      $("cadence").textContent = Math.round(last.cadence);
+    }
+    if (last.hr != null) {
+      $("heartRate").textContent = Math.round(last.hr);
+      $("heartRate").style.color = "var(--hr-color)";
+    }
+    if (last.calories != null) {
+      $("calories").textContent = last.calories;
+    }
+  }
 
   drawChart();
 }
@@ -301,15 +363,13 @@ function updateUI(data) {
     $("zoneLabel").textContent = w > 0 ? `Z${zone.idx + 1} · ${zone.name}` : "—";
     $("zoneLabel").style.color = w > 0 ? zone.color : "";
 
-    if (!exerciseStartTime) exerciseStartTime = now;
-
     exerciseData.push({
       ts: now,
       power: w,
       speed: data.speed,
       cadence: data.cadence,
       hr: data.heartRate,
-      distance: data.distance ?? accumulatedDistance,
+      distance: data.accumulatedDistance ?? data.distance ?? accumulatedDistance,
       calories: data.calories,
     });
 
@@ -335,17 +395,11 @@ function updateUI(data) {
 
   if (data.speed != null) {
     speedEl.textContent = (data.speed * 3.6).toFixed(1);
-
-    if (lastDataTime != null) {
-      const dt = (now - lastDataTime) / 1000;
-      if (dt > 0 && dt < 10) {
-        accumulatedDistance += data.speed * dt;
-      }
-    }
-    lastDataTime = now;
   }
 
-  const distMeters = data.distance != null ? data.distance : accumulatedDistance;
+  // Use server-accumulated distance (prefer it over trainer's Distance which may report 0)
+  accumulatedDistance = data.accumulatedDistance ?? accumulatedDistance;
+  const distMeters = accumulatedDistance || 0;
   if (distMeters >= 1000) {
     $("distance").textContent = (distMeters / 1000).toFixed(2);
     $("distUnit").textContent = "km";
@@ -366,7 +420,9 @@ function updateUI(data) {
     $("hrBar").style.width = pct + "%";
   }
 
-  $("elapsed").textContent = formatTime(data.elapsedTime);
+  // Use server-tracked session elapsed time
+  sessionElapsed = data.elapsedTime ?? sessionElapsed;
+  $("elapsed").textContent = formatTime(sessionElapsed);
 
   if (data.calories != null) {
     $("calories").textContent = data.calories;
@@ -397,12 +453,14 @@ setInterval(() => {
 
 function connect() {
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  const ws = new WebSocket(`${protocol}//${location.host}`);
+  ws = new WebSocket(`${protocol}//${location.host}`);
 
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     if (data.type === "fitness") updateUI(data);
     else if (data.type === "status") updateStatus(data);
+    else if (data.type === "sessionRestore") restoreSession(data);
+    else if (data.type === "sessionReset") applyReset();
   };
 
   ws.onclose = () => {
